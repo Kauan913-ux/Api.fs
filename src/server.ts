@@ -1,33 +1,35 @@
 import express from "express";
-import * as fs from "fs";
 import axios from "axios"
+
+import { DatabaseJSON } from "./infrastructure/database-json";
+import { User } from "./domain/user";
 
 const app = express();
 
 app.use(express.json());
 
-app.get("/customers", async (request, response) => {
-  const databaseStr = fs.readFileSync(`database.json`, { encoding: `utf-8` });
+const fsDatabase = new DatabaseJSON('database.json');
 
-  const database = JSON.parse(databaseStr);
+app.get("/customers", async (request, response) => {
+  const database = fsDatabase.query();
 
   response.json(database);
 });
 
 app.patch("/customers", async (request, response) => {
-  const databaseStr = fs.readFileSync(`database.json`, { encoding: `utf-8` });
-  const database = JSON.parse(databaseStr);
+  try {
+    const user = new User(request.body);
 
-  const { id, name, email } = request.body;
+    const insertedUser = fsDatabase.update(user);
 
-  const customerIndex = database.findIndex((customers) => customers.id === id);
-  if (customerIndex === -1) {
-    return response.status(404).json({ error: "Customer not found." });
+    if (!insertedUser) {
+      return response.status(404).json({ error: "Customer not found." });
+    }
+
+    response.json(insertedUser);
+  } catch (err) {
+    response.status(400).json({ error: err?.message ?? 'Error desconhecido' });
   }
-
-  database[customerIndex] = { id, name, email };
-  fs.writeFileSync(`database.json`, JSON.stringify(database, null, 2));
-  response.json(database[customerIndex]);
 });
 
 app.listen(3000);
